@@ -1,0 +1,2268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Titration Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { font-size: 1.3rem; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; }
+    header .subtitle { font-size: 0.8rem; color: #64748b; }
+
+    .tab-nav {
+      display: flex;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 0 24px;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #64748b;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+    .tab-btn:hover:not(.active) { color: #94a3b8; }
+
+    .tab-content { display: none; flex: 1; }
+    .tab-content.active { display: flex; flex-direction: column; }
+
+    .app-layout {
+      display: grid;
+      grid-template-columns: 270px 400px 1fr;
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+      min-height: 0;
+      align-items: start;
+    }
+
+    /* ── Controls Panel ── */
+    .controls-panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ctrl-section { display: flex; flex-direction: column; gap: 8px; }
+    .ctrl-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .ctrl-name {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-style: italic;
+    }
+
+    .toggle-row {
+      display: flex;
+      background: #0f172a;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+    .toggle-btn {
+      flex: 1;
+      padding: 7px 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #64748b;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .toggle-btn.active {
+      background: #0ea5e9;
+      color: #fff;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: #0ea5e9;
+    }
+    .slider-val {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #38bdf8;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    select {
+      width: 100%;
+      padding: 7px 10px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.82rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .divider {
+      height: 1px;
+      background: #334155;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: #0ea5e9;
+      color: #fff;
+    }
+    .btn-primary:hover { background: #0284c7; }
+    .btn-secondary {
+      background: #1e3a5f;
+      color: #38bdf8;
+      border: 1px solid #1d4ed8;
+    }
+    .btn-secondary:hover { background: #1e40af; color: #fff; }
+    .btn-row { display: flex; gap: 6px; }
+    .btn-row .btn { flex: 1; }
+    .btn-danger {
+      background: #1e293b;
+      color: #94a3b8;
+      border: 1px solid #334155;
+    }
+    .btn-danger:hover { background: #7f1d1d; color: #fca5a5; border-color: #991b1b; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .info-box {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.78rem;
+    }
+    .info-row .label { color: #64748b; }
+    .info-row .value { color: #38bdf8; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .info-row .value.highlight { color: #f59e0b; }
+    .info-row .value.red { color: #f87171; }
+
+    /* ── Viz Panel ── */
+    .viz-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    canvas#beakerCanvas, canvas#backBeakerCanvas {
+      border-radius: 12px;
+      display: block;
+    }
+
+    .legend {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Chart Panel ── */
+    .chart-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .chart-wrap {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 16px;
+      position: relative;
+    }
+    .chart-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .chart-wrap canvas { display: block; }
+
+    .markers-panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .marker-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .marker-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .marker-label { color: #94a3b8; }
+    .marker-val { color: #e2e8f0; font-weight: 600; margin-left: auto; font-variant-numeric: tabular-nums; }
+
+    .indicator-info {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .indicator-info strong { color: #e2e8f0; }
+    .color-swatch {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin: 0 3px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    @media (max-width: 1100px) {
+      .app-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+      .viz-panel { align-items: center; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Titration Visualizer</h1>
+    <div class="subtitle">Interactive acid-base titration with molecular visualization</div>
+  </div>
+</header>
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('standard')">Standard Titration</button>
+  <button class="tab-btn" onclick="switchTab('back')">Back Titration — Water Hardness</button>
+</div>
+
+<!-- ===== STANDARD TITRATION TAB ===== -->
+<div id="tab-standard" class="tab-content active">
+  <div class="app-layout">
+
+    <!-- Controls -->
+    <div class="controls-panel">
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Analyte (in beaker)</div>
+        <div class="toggle-row">
+          <button class="toggle-btn active" onclick="setAcidType('strong')">Strong Acid</button>
+          <button class="toggle-btn" onclick="setAcidType('weak')">Weak Acid</button>
+        </div>
+        <div class="ctrl-name" id="acidName">HCl (hydrochloric acid)</div>
+        <div class="slider-row">
+          <span style="font-size:0.72rem;color:#64748b">Conc.</span>
+          <input type="range" id="acidConc" min="0.05" max="1.0" step="0.05" value="0.1"
+            oninput="updateAcidConc(this.value)">
+          <span class="slider-val" id="acidConcVal">0.10 M</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Titrant (in burette)</div>
+        <div class="toggle-row">
+          <button class="toggle-btn active" onclick="setBaseType('strong')">Strong Base</button>
+          <button class="toggle-btn" onclick="setBaseType('weak')">Weak Base</button>
+        </div>
+        <div class="ctrl-name" id="baseName">NaOH (sodium hydroxide)</div>
+        <div class="slider-row">
+          <span style="font-size:0.72rem;color:#64748b">Conc.</span>
+          <input type="range" id="baseConc" min="0.05" max="1.0" step="0.05" value="0.1"
+            oninput="updateBaseConc(this.value)">
+          <span class="slider-val" id="baseConcVal">0.10 M</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Direction</div>
+        <div class="toggle-row">
+          <button class="toggle-btn active" onclick="setDirection('base_into_acid')">Base → Acid</button>
+          <button class="toggle-btn" onclick="setDirection('acid_into_base')">Acid → Base</button>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Indicator</div>
+        <select id="indicatorSelect" onchange="setIndicator(this.value)">
+          <option value="phenolphthalein">Phenolphthalein</option>
+          <option value="methyl_orange">Methyl Orange</option>
+          <option value="bromothymol_blue">Bromothymol Blue</option>
+          <option value="litmus">Litmus</option>
+        </select>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Drop Volume</div>
+        <div class="slider-row">
+          <input type="range" id="dropVol" min="0.02" max="0.5" step="0.01" value="0.05"
+            oninput="updateDropVol(this.value)">
+          <span class="slider-val" id="dropVolVal">0.05 mL</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnDrop" onclick="addDrop()">+ Add Drop</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btnPlay" onclick="togglePlay()">&#9654; Play</button>
+          <button class="btn btn-secondary" id="btnFast" onclick="toggleFast()">&#9654;&#9654; Fast</button>
+        </div>
+        <button class="btn btn-secondary" onclick="skipToHalfEq()">Skip to ½ Eq. Pt.</button>
+        <button class="btn btn-secondary" onclick="skipToEq()">Skip to Eq. Point</button>
+        <button class="btn btn-secondary" onclick="skipToEnd()">Skip to End</button>
+        <button class="btn btn-danger" onclick="resetStd()">&#8635; Reset</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="label">pH</span>
+          <span class="value" id="pHDisplay">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Volume added</span>
+          <span class="value" id="volDisplay">0.00 mL</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Eq. volume (calc.)</span>
+          <span class="value highlight" id="eqVolDisplay">—</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Beaker visualization -->
+    <div class="viz-panel">
+      <canvas id="beakerCanvas" width="400" height="440"></canvas>
+      <div class="legend" id="stdLegend"></div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-panel">
+      <div class="chart-wrap">
+        <div class="chart-title">Titration Curve — pH vs. Volume Titrant Added</div>
+        <canvas id="titrationChart" height="260"></canvas>
+      </div>
+      <div class="markers-panel" id="stdMarkers">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Key Points</div>
+        <div class="marker-row" id="eqMarkerRow" style="display:none">
+          <div class="marker-dot" style="background:#f59e0b"></div>
+          <span class="marker-label">Equivalence Point</span>
+          <span class="marker-val" id="eqMarkerVal">—</span>
+        </div>
+        <div class="marker-row" id="halfEqMarkerRow" style="display:none">
+          <div class="marker-dot" style="background:#a78bfa"></div>
+          <span class="marker-label">Half-Eq. Point (pH = pKₐ)</span>
+          <span class="marker-val" id="halfEqMarkerVal">—</span>
+        </div>
+        <div style="font-size:0.75rem;color:#475569" id="markersHint">Complete the titration to reveal key points.</div>
+      </div>
+      <div class="indicator-info" id="indicatorInfo"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== BACK TITRATION TAB ===== -->
+<div id="tab-back" class="tab-content">
+  <div class="app-layout">
+
+    <div class="controls-panel">
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Water Sample (Analyte)</div>
+        <select id="waterSource" onchange="setWaterSource(this.value)">
+          <option value="distilled">Distilled Water (0 ppm)</option>
+          <option value="soft">Soft Tap Water (~80 ppm)</option>
+          <option value="moderate" selected>Average Tap Water (~230 ppm)</option>
+          <option value="hard">Hard Tap Water (~450 ppm)</option>
+          <option value="well">Well Water (~750 ppm)</option>
+        </select>
+        <div class="info-box" id="waterInfoBox">
+          <div class="info-row"><span class="label">Ca²⁺</span><span class="value" id="wCa">—</span></div>
+          <div class="info-row"><span class="label">Mg²⁺</span><span class="value" id="wMg">—</span></div>
+          <div class="info-row"><span class="label">Total hardness</span><span class="value highlight" id="wHardness">—</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Reagents (Pre-set)</div>
+        <div class="info-box">
+          <div class="info-row"><span class="label">Sample volume</span><span class="value">25.0 mL</span></div>
+          <div class="info-row"><span class="label">EDTA added</span><span class="value">25 mL @ 0.01 M</span></div>
+          <div class="info-row"><span class="label">Indicator</span><span class="value" style="color:#a78bfa">Eriochrome Black T</span></div>
+          <div class="info-row"><span class="label">Titrant</span><span class="value">Mg²⁺ @ 0.01 M</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">Drop Volume</div>
+        <div class="slider-row">
+          <input type="range" id="backDropVol" min="0.02" max="0.5" step="0.01" value="0.05"
+            oninput="updateBackDropVol(this.value)">
+          <span class="slider-val" id="backDropVolVal">0.05 mL</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btnBackDrop" onclick="addBackDrop()">+ Add Drop (Mg²⁺)</button>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btnBackPlay" onclick="toggleBackPlay()">&#9654; Play</button>
+          <button class="btn btn-secondary" id="btnBackFast" onclick="toggleBackFast()">&#9654;&#9654; Fast</button>
+        </div>
+        <button class="btn btn-secondary" onclick="skipBackToEndpoint()">Skip to Endpoint</button>
+        <button class="btn btn-secondary" onclick="skipBackToEnd()">Skip to End</button>
+        <button class="btn btn-danger" onclick="resetBack()">&#8635; Reset</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="info-box">
+        <div class="info-row">
+          <span class="label">pMg</span>
+          <span class="value" id="pMgDisplay">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Mg²⁺ added</span>
+          <span class="value" id="backVolDisplay">0.00 mL</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Endpoint (calc.)</span>
+          <span class="value highlight" id="backEqDisplay">—</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Measured hardness</span>
+          <span class="value" id="hardnessResult" style="color:#4ade80">—</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="viz-panel">
+      <canvas id="backBeakerCanvas" width="400" height="440"></canvas>
+      <div class="legend" id="backLegend"></div>
+    </div>
+
+    <div class="chart-panel">
+      <div class="chart-wrap">
+        <div class="chart-title">Back Titration Curve — pMg vs. Volume Mg²⁺ Added</div>
+        <canvas id="backTitrationChart" height="260"></canvas>
+      </div>
+      <div class="markers-panel">
+        <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;">Key Points</div>
+        <div class="marker-row" id="backEqMarkerRow" style="display:none">
+          <div class="marker-dot" style="background:#f59e0b"></div>
+          <span class="marker-label">Endpoint (Colour change)</span>
+          <span class="marker-val" id="backEqMarkerVal">—</span>
+        </div>
+        <div style="font-size:0.75rem;color:#475569" id="backMarkersHint">Add Mg²⁺ to consume excess EDTA. The colour changes from blue → wine red at the endpoint.</div>
+      </div>
+      <div class="indicator-info">
+        <strong>Eriochrome Black T (EBT)</strong>
+        <div>
+          <span class="color-swatch" style="background:#1e3a8a"></span>Blue = EDTA in excess (all Mg²⁺ chelated)
+        </div>
+        <div>
+          <span class="color-swatch" style="background:#7f1d1d"></span>Wine red = Free Mg²⁺ present (endpoint passed)
+        </div>
+        <div style="margin-top:4px;color:#64748b">
+          Hardness = (moles EDTA − moles Mg²⁺ at endpoint) / sample volume
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CHEMISTRY ENGINE
+// ============================================================
+
+const Ka_acetic = 1.8e-5;
+const Kb_NH3    = 1.8e-5;
+const Kw        = 1e-14;
+const K_MgEDTA  = 4.9e8;
+const K_CaEDTA  = 5.0e10;
+
+function clampPH(ph) { return Math.max(0, Math.min(14, ph)); }
+
+// Solve quadratic ax² + bx + c = 0, return positive root
+function quadPos(a, b, c) {
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return 0;
+  return (-b + Math.sqrt(disc)) / (2 * a);
+}
+
+// pH: base into acid (NaOH/NH3 added to HCl/CH3COOH)
+function calcPH_B2A(acidType, baseType, Ca, Cb, Va, Vb) {
+  const nA = Ca * Va / 1000; // moles acid
+  const nB = Cb * Vb / 1000; // moles base
+  const V  = (Va + Vb) / 1000; // L
+
+  if (acidType === 'strong' && baseType === 'strong') {
+    if (Vb === 0) return clampPH(-Math.log10(Ca));
+    const exc = nA - nB;
+    if (Math.abs(exc) < 1e-14) return 7.0;
+    if (exc > 0) return clampPH(-Math.log10(exc / V));
+    return clampPH(14 + Math.log10(-exc / V));
+  }
+
+  if (acidType === 'weak' && baseType === 'strong') {
+    // CH3COOH + NaOH
+    const Ka = Ka_acetic;
+    if (Vb === 0) {
+      const h = quadPos(1, Ka, -Ka * Ca);
+      return clampPH(-Math.log10(h));
+    }
+    if (nB < nA - 1e-14) {
+      // Exact buffer calculation
+      const C_HA = (nA - nB) / V;
+      const C_A  = nB / V;
+      const h    = quadPos(1, Ka + C_A, -Ka * C_HA);
+      return clampPH(-Math.log10(h));
+    }
+    if (Math.abs(nB - nA) < 1e-14) {
+      // Equivalence: acetate hydrolysis
+      const C_A  = nA / V;
+      const Kb_a = Kw / Ka;
+      const oh   = quadPos(1, Kb_a, -Kb_a * C_A);
+      return clampPH(14 + Math.log10(oh));
+    }
+    // After equivalence: excess NaOH
+    return clampPH(14 + Math.log10((nB - nA) / V));
+  }
+
+  if (acidType === 'strong' && baseType === 'weak') {
+    // HCl + NH3
+    const Kb = Kb_NH3;
+    const Ka_NH4 = Kw / Kb;
+    if (Vb === 0) return clampPH(-Math.log10(Ca));
+    if (nB < nA - 1e-14) {
+      // Excess HCl
+      return clampPH(-Math.log10((nA - nB) / V));
+    }
+    if (Math.abs(nB - nA) < 1e-14) {
+      // NH4+ solution
+      const C_NH4 = nA / V;
+      const h = quadPos(1, Ka_NH4, -Ka_NH4 * C_NH4);
+      return clampPH(-Math.log10(h));
+    }
+    // After eq: NH3/NH4+ buffer
+    const exNH3 = nB - nA;
+    const pOH = -Math.log10(Kb) + Math.log10(nA / exNH3);
+    return clampPH(14 - pOH);
+  }
+
+  if (acidType === 'weak' && baseType === 'weak') {
+    // CH3COOH + NH3
+    const Ka = Ka_acetic;
+    const Kb = Kb_NH3;
+    if (Vb === 0) {
+      const h = quadPos(1, Ka, -Ka * Ca);
+      return clampPH(-Math.log10(h));
+    }
+    if (nB < nA - 1e-14) {
+      const C_HA = (nA - nB) / V;
+      const C_A  = nB / V;
+      const h    = quadPos(1, Ka + C_A, -Ka * C_HA);
+      return clampPH(-Math.log10(h));
+    }
+    if (Math.abs(nB - nA) < 1e-14) {
+      return clampPH(7 + (-Math.log10(Ka) - (-Math.log10(Kb))) / 2);
+    }
+    const exNH3 = nB - nA;
+    const pOH = -Math.log10(Kb) + Math.log10(nA / exNH3);
+    return clampPH(14 - pOH);
+  }
+
+  return 7;
+}
+
+// pH: acid into base (HCl/CH3COOH added to NaOH/NH3)
+function calcPH_A2B(acidType, baseType, Ca, Cb, Vb, Va) {
+  const nA = Ca * Va / 1000;
+  const nB = Cb * Vb / 1000;
+  const V  = (Va + Vb) / 1000;
+
+  if (acidType === 'strong' && baseType === 'strong') {
+    if (Va === 0) return clampPH(14 + Math.log10(Cb));
+    const exc = nB - nA;
+    if (Math.abs(exc) < 1e-14) return 7.0;
+    if (exc > 0) return clampPH(14 + Math.log10(exc / V));
+    return clampPH(-Math.log10(-exc / V));
+  }
+
+  if (acidType === 'strong' && baseType === 'weak') {
+    // HCl into NH3
+    const Kb = Kb_NH3;
+    const Ka_NH4 = Kw / Kb;
+    if (Va === 0) {
+      const oh = quadPos(1, Kb, -Kb * Cb);
+      return clampPH(14 + Math.log10(oh));
+    }
+    if (nA < nB - 1e-14) {
+      // NH3/NH4+ buffer
+      const pOH = -Math.log10(Kb) + Math.log10(nA / (nB - nA));
+      return clampPH(14 - pOH);
+    }
+    if (Math.abs(nA - nB) < 1e-14) {
+      const C_NH4 = nB / V;
+      const h = quadPos(1, Ka_NH4, -Ka_NH4 * C_NH4);
+      return clampPH(-Math.log10(h));
+    }
+    return clampPH(-Math.log10((nA - nB) / V));
+  }
+
+  if (acidType === 'weak' && baseType === 'strong') {
+    // CH3COOH into NaOH
+    const Ka = Ka_acetic;
+    if (Va === 0) return clampPH(14 + Math.log10(Cb));
+    if (nA < nB - 1e-14) {
+      return clampPH(14 + Math.log10((nB - nA) / V));
+    }
+    if (Math.abs(nA - nB) < 1e-14) {
+      const C_A = nB / V;
+      const Kb_a = Kw / Ka;
+      const oh = quadPos(1, Kb_a, -Kb_a * C_A);
+      return clampPH(14 + Math.log10(oh));
+    }
+    // After eq: CH3COOH/CH3COO- buffer
+    const C_HA = (nA - nB) / V;
+    const C_A  = nB / V;
+    const h    = quadPos(1, Ka + C_A, -Ka * C_HA);
+    return clampPH(-Math.log10(h));
+  }
+
+  if (acidType === 'weak' && baseType === 'weak') {
+    // CH3COOH into NH3
+    const Ka = Ka_acetic;
+    const Kb = Kb_NH3;
+    if (Va === 0) {
+      const oh = quadPos(1, Kb, -Kb * Cb);
+      return clampPH(14 + Math.log10(oh));
+    }
+    if (nA < nB - 1e-14) {
+      const pOH = -Math.log10(Kb) + Math.log10(nA / (nB - nA));
+      return clampPH(14 - pOH);
+    }
+    if (Math.abs(nA - nB) < 1e-14) {
+      return clampPH(7 + (-Math.log10(Ka) - (-Math.log10(Kb))) / 2);
+    }
+    const C_HA = (nA - nB) / V;
+    const C_A  = nB / V;
+    const h    = quadPos(1, Ka + C_A, -Ka * C_HA);
+    return clampPH(-Math.log10(h));
+  }
+
+  return 7;
+}
+
+function computePH(state, vol) {
+  if (state.direction === 'base_into_acid') {
+    return calcPH_B2A(state.acidType, state.baseType, state.acidConc, state.baseConc, state.analyteVol, vol);
+  } else {
+    return calcPH_A2B(state.acidType, state.baseType, state.acidConc, state.baseConc, state.analyteVol, vol);
+  }
+}
+
+function computeEquivVolume(state) {
+  // V_eq where moles_acid = moles_base
+  // Ca * Va = Cb * Veq => Veq = Ca * Va / Cb
+  const Va = state.analyteVol;
+  if (state.direction === 'base_into_acid') {
+    return (state.acidConc * Va) / state.baseConc;
+  } else {
+    return (state.baseConc * Va) / state.acidConc;
+  }
+}
+
+function buildFullCurve(state) {
+  const veq = computeEquivVolume(state);
+  const maxV = veq * 2.2;
+  const step = maxV / 400;
+  const pts = [];
+  for (let v = 0; v <= maxV + step; v += step) {
+    pts.push({ x: +v.toFixed(4), y: computePH(state, v) });
+  }
+  return pts;
+}
+
+// ============================================================
+// BACK TITRATION CHEMISTRY
+// ============================================================
+
+const WATER_SOURCES = {
+  distilled: { name: 'Distilled Water',      Ca: 0,       Mg: 0,       label: '0 ppm' },
+  soft:      { name: 'Soft Tap Water',        Ca: 5e-4,    Mg: 3e-4,    label: '~80 ppm' },
+  moderate:  { name: 'Average Tap Water',     Ca: 1.5e-3,  Mg: 8e-4,    label: '~230 ppm' },
+  hard:      { name: 'Hard Tap Water',        Ca: 3.0e-3,  Mg: 1.5e-3,  label: '~450 ppm' },
+  well:      { name: 'Well Water',            Ca: 5.0e-3,  Mg: 2.5e-3,  label: '~750 ppm' },
+};
+
+function calcPMg(bState, volMg) {
+  const ws = WATER_SOURCES[bState.waterSource];
+  const sampleL  = bState.sampleVol / 1000;
+  const edtaL    = bState.edtaVol / 1000;
+  const mgL      = volMg / 1000;
+  const V_total  = sampleL + edtaL + mgL;
+
+  const n_Ca   = ws.Ca * sampleL;
+  const n_Mg_s = ws.Mg * sampleL;
+  const n_metals = n_Ca + n_Mg_s;
+
+  const n_EDTA   = bState.edtaConc * edtaL;
+  const n_MgAdded = bState.mgConc * mgL;
+
+  const n_EDTA_excess = n_EDTA - n_metals; // should be > 0 initially
+
+  if (n_EDTA_excess <= 0) {
+    // Not enough EDTA for initial metals — clamp to high pMg (metals unchelated)
+    return 3.0;
+  }
+
+  // EDTA remaining after consuming added Mg2+
+  const n_EDTA_remaining = n_EDTA_excess - n_MgAdded;
+
+  if (n_EDTA_remaining > 1e-14) {
+    // Excess EDTA present: Mg2+ is chelated
+    // [free Mg2+] = [MgEDTA] / (K * [EDTA_free])
+    const C_MgEDTA    = (n_Mg_s + n_MgAdded) / V_total;
+    const C_EDTA_free = n_EDTA_remaining / V_total;
+    const C_Mg_free   = C_MgEDTA / (K_MgEDTA * C_EDTA_free);
+    if (C_Mg_free <= 0) return 12;
+    return Math.min(12, -Math.log10(C_Mg_free));
+  } else {
+    // Excess Mg2+ after endpoint
+    const excess_Mg = -n_EDTA_remaining;
+    if (excess_Mg <= 0) return 12;
+    const C_Mg_free = excess_Mg / V_total;
+    return Math.max(0, -Math.log10(C_Mg_free));
+  }
+}
+
+function buildBackCurve(bState) {
+  const ws = WATER_SOURCES[bState.waterSource];
+  const n_metals = (ws.Ca + ws.Mg) * (bState.sampleVol / 1000);
+  const n_EDTA_excess = bState.edtaConc * (bState.edtaVol / 1000) - n_metals;
+  const veq = Math.max(0, n_EDTA_excess / bState.mgConc * 1000); // mL
+  const maxV = veq * 2.2 + 1;
+  const step = maxV / 300;
+  const pts = [];
+  for (let v = 0; v <= maxV + step; v += step) {
+    pts.push({ x: +v.toFixed(4), y: calcPMg(bState, v) });
+  }
+  return pts;
+}
+
+function computeHardness(bState, veqMl) {
+  const n_EDTA   = bState.edtaConc * bState.edtaVol / 1000;
+  const n_MgTitr = bState.mgConc * veqMl / 1000;
+  const n_metals  = n_EDTA - n_MgTitr;
+  const hardnessMgL = n_metals * 100000 / (bState.sampleVol / 1000); // ppm CaCO3
+  return hardnessMgL;
+}
+
+// ============================================================
+// INDICATOR COLORS
+// ============================================================
+
+const INDICATORS = {
+  phenolphthalein: {
+    label: 'Phenolphthalein',
+    range: 'pH 8.2 – 10',
+    acidColor: 'colorless', baseColor: 'magenta',
+    solution: (pH) => {
+      if (pH < 8.2) return 'rgba(200,230,255,0.08)';
+      const t = Math.min((pH - 8.2) / 1.8, 1);
+      return `rgba(255,20,147,${t * 0.45})`;
+    },
+    bg: (pH) => {
+      if (pH < 8.2) return '#0f172a';
+      const t = Math.min((pH - 8.2) / 1.8, 1);
+      const r = Math.round(t * 80);
+      return `rgb(${r},0,${Math.round(t*40)})`;
+    }
+  },
+  methyl_orange: {
+    label: 'Methyl Orange',
+    range: 'pH 3.1 – 4.4',
+    acidColor: 'red', baseColor: 'yellow',
+    solution: (pH) => {
+      if (pH < 3.1) return 'rgba(220,38,38,0.35)';
+      if (pH < 4.4) {
+        const t = (pH - 3.1) / 1.3;
+        const r = Math.round(220 + t * (251 - 220));
+        const g = Math.round(0 + t * 191);
+        return `rgba(${r},${g},0,0.35)`;
+      }
+      return 'rgba(251,191,36,0.35)';
+    },
+    bg: (pH) => {
+      if (pH < 3.1) return '#1a0000';
+      if (pH < 4.4) {
+        const t = (pH - 3.1) / 1.3;
+        return `rgb(${Math.round(40*t)},${Math.round(20*t)},0)`;
+      }
+      return '#1a1500';
+    }
+  },
+  bromothymol_blue: {
+    label: 'Bromothymol Blue',
+    range: 'pH 6.0 – 7.6',
+    acidColor: 'yellow', baseColor: 'blue',
+    solution: (pH) => {
+      if (pH < 6.0) return 'rgba(251,191,36,0.3)';
+      if (pH < 7.6) {
+        const t = (pH - 6.0) / 1.6;
+        if (t < 0.5) {
+          const t2 = t * 2;
+          return `rgba(${Math.round(251*(1-t2))},${Math.round(191+t2*64)},0,0.3)`;
+        }
+        const t2 = (t - 0.5) * 2;
+        return `rgba(0,${Math.round(255*(1-t2*0.5))},${Math.round(t2*200)},0.3)`;
+      }
+      return 'rgba(59,130,246,0.35)';
+    },
+    bg: (pH) => {
+      if (pH < 6.0) return '#141000';
+      if (pH < 7.6) return '#0a0f10';
+      return '#000a1a';
+    }
+  },
+  litmus: {
+    label: 'Litmus',
+    range: '~pH 7',
+    acidColor: 'red', baseColor: 'blue',
+    solution: (pH) => {
+      if (pH < 6.5) return 'rgba(220,38,38,0.25)';
+      if (pH < 7.5) return 'rgba(150,80,200,0.2)';
+      return 'rgba(59,130,246,0.25)';
+    },
+    bg: (pH) => {
+      if (pH < 6.5) return '#140000';
+      if (pH < 7.5) return '#0a0010';
+      return '#00000a';
+    }
+  },
+};
+
+function ebtColor(pMg) {
+  if (pMg > 7) return 'rgba(30,58,138,0.5)';
+  if (pMg < 4) return 'rgba(127,29,29,0.5)';
+  const t = (pMg - 4) / 3;
+  const r = Math.round(127 + t * (30 - 127));
+  const g = Math.round(29 + t * (58 - 29));
+  const b = Math.round(29 + t * (138 - 29));
+  return `rgba(${r},${g},${b},0.5)`;
+}
+
+function ebtBg(pMg) {
+  if (pMg > 7) return '#00000a';
+  if (pMg < 4) return '#140000';
+  const t = (pMg - 4) / 3;
+  return `rgb(${Math.round(20*(1-t))},0,${Math.round(10*t)})`;
+}
+
+// ============================================================
+// PARTICLE SYSTEM
+// ============================================================
+
+const PTYPES = {
+  'H+':        { fill: '#ef4444', stroke: '#dc2626', r: 6,  label: 'H⁺' },
+  'OH-':       { fill: '#3b82f6', stroke: '#2563eb', r: 7,  label: 'OH⁻' },
+  'H2O':       { fill: '#7dd3fc', stroke: '#38bdf8', r: 4,  label: 'H₂O' },
+  'Na+':       { fill: '#f97316', stroke: '#ea580c', r: 5,  label: 'Na⁺' },
+  'Cl-':       { fill: '#22c55e', stroke: '#16a34a', r: 5,  label: 'Cl⁻' },
+  'CH3COOH':   { fill: '#fbbf24', stroke: '#f59e0b', r: 10, label: 'CH₃COOH' },
+  'CH3COO-':   { fill: '#d97706', stroke: '#b45309', r: 9,  label: 'CH₃COO⁻' },
+  'NH3':       { fill: '#a78bfa', stroke: '#8b5cf6', r: 9,  label: 'NH₃' },
+  'NH4+':      { fill: '#c084fc', stroke: '#a855f7', r: 7,  label: 'NH₄⁺' },
+  'Ca2+':      { fill: '#c026d3', stroke: '#a21caf', r: 8,  label: 'Ca²⁺' },
+  'Mg2+':      { fill: '#14b8a6', stroke: '#0d9488', r: 7,  label: 'Mg²⁺' },
+  'EDTA':      { fill: '#6366f1', stroke: '#4f46e5', r: 11, label: 'EDTA' },
+  'EDTA-Ca':   { fill: '#d946ef', stroke: '#a21caf', r: 12, label: 'EDTA-Ca' },
+  'EDTA-Mg':   { fill: '#5eead4', stroke: '#2dd4bf', r: 11, label: 'EDTA-Mg' },
+  'free-Mg':   { fill: '#14b8a6', stroke: '#0d9488', r: 7,  label: 'free Mg²⁺' },
+  'EBT-Mg':    { fill: '#be185d', stroke: '#9d174d', r: 10, label: 'EBT-Mg' },
+};
+
+// Beaker geometry (canvas 400x440)
+const BK = {
+  left:   100,
+  right:  300,
+  top:    190,
+  bottom: 380,
+  wall:   3,
+  bRad:   14,
+};
+// Burette tip position
+const BUR_X = 200;
+const BUR_Y = 180;
+
+function mkParticle(type, x, y, beakerBounds) {
+  const info = PTYPES[type];
+  const bb = beakerBounds || { left: BK.left+BK.wall+info.r, right: BK.right-BK.wall-info.r,
+                                top: BK.top+info.r+10, bottom: BK.bottom-info.r-10 };
+  const px = x !== undefined ? x : bb.left + Math.random() * (bb.right - bb.left);
+  const py = y !== undefined ? y : bb.top  + Math.random() * (bb.bottom - bb.top);
+  const spd = 20 + Math.random() * 20;
+  const ang = Math.random() * Math.PI * 2;
+  return {
+    type, x: px, y: py,
+    vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+    r: info.r, fill: info.fill, stroke: info.stroke,
+    alpha: 1, life: 1,
+  };
+}
+
+function getParticleBounds(liquidTop) {
+  return {
+    left:   BK.left   + BK.wall + 2,
+    right:  BK.right  - BK.wall - 2,
+    top:    liquidTop + 2,
+    bottom: BK.bottom - 8,
+  };
+}
+
+function updateParticles(particles, liquidTop, dt) {
+  const bb = getParticleBounds(liquidTop);
+  const brownStrength = 60;
+
+  for (const p of particles) {
+    p.vx += (Math.random() - 0.5) * brownStrength * dt * 60;
+    p.vy += (Math.random() - 0.5) * brownStrength * dt * 60;
+    // damp
+    p.vx *= (1 - 2 * dt);
+    p.vy *= (1 - 2 * dt);
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    // wall bounce
+    if (p.x - p.r < bb.left)   { p.x = bb.left   + p.r; p.vx =  Math.abs(p.vx); }
+    if (p.x + p.r > bb.right)  { p.x = bb.right  - p.r; p.vx = -Math.abs(p.vx); }
+    if (p.y - p.r < bb.top)    { p.y = bb.top    + p.r; p.vy =  Math.abs(p.vy); }
+    if (p.y + p.r > bb.bottom) { p.y = bb.bottom - p.r; p.vy = -Math.abs(p.vy); }
+  }
+}
+
+// Target composition for standard titration
+function getStdComposition(state) {
+  const { acidType, baseType, acidConc, baseConc, analyteVol, direction } = state;
+  const vol = state.volumeAdded;
+  const veq = computeEquivVolume(state);
+  const f   = veq > 0 ? Math.min(vol / veq, 2.5) : 0;
+
+  const N = 70;
+  const comp = {};
+
+  if (direction === 'base_into_acid') {
+    if (acidType === 'strong' && baseType === 'strong') {
+      comp['H+']  = Math.round(Math.max(1 - f, 0) * 0.45 * N);
+      comp['Cl-'] = Math.round(0.35 * N);
+      comp['OH-'] = Math.round(Math.max(f - 1, 0) * 0.4 * N);
+      comp['Na+'] = Math.round(Math.min(f, 1) * 0.35 * N + Math.max(f-1,0)*0.35*N);
+      comp['H2O'] = Math.round(Math.min(f, 1) * 0.1 * N + 5);
+    } else if (acidType === 'weak' && baseType === 'strong') {
+      comp['CH3COOH'] = Math.round(Math.max(1 - f, 0) * 0.4 * N);
+      comp['CH3COO-'] = Math.round(Math.min(f, 1) * 0.35 * N);
+      comp['H+']       = Math.round(Math.max(1 - f, 0) * 0.03 * N);
+      comp['Na+']      = Math.round(Math.min(f, 1) * 0.3 * N + Math.max(f-1,0)*0.3*N);
+      comp['OH-']      = Math.round(Math.max(f - 1, 0) * 0.35 * N);
+      comp['H2O']      = 6;
+    } else if (acidType === 'strong' && baseType === 'weak') {
+      comp['H+']   = Math.round(Math.max(1 - f, 0) * 0.4 * N);
+      comp['Cl-']  = Math.round(0.3 * N);
+      comp['NH3']  = Math.round(Math.max(f - 1, 0) * 0.35 * N);
+      comp['NH4+'] = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['H2O']  = 5;
+    } else {
+      comp['CH3COOH'] = Math.round(Math.max(1 - f, 0) * 0.35 * N);
+      comp['CH3COO-'] = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['H+']       = Math.round(Math.max(1 - f, 0) * 0.02 * N);
+      comp['NH3']      = Math.round(Math.max(f - 1, 0) * 0.3 * N);
+      comp['NH4+']     = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['H2O']      = 5;
+    }
+  } else {
+    // acid into base — swap H+ ↔ OH-, acid ↔ base roles
+    if (acidType === 'strong' && baseType === 'strong') {
+      comp['OH-'] = Math.round(Math.max(1 - f, 0) * 0.45 * N);
+      comp['Na+'] = Math.round(0.35 * N);
+      comp['H+']  = Math.round(Math.max(f - 1, 0) * 0.4 * N);
+      comp['Cl-'] = Math.round(Math.min(f, 1) * 0.35 * N + Math.max(f-1,0)*0.35*N);
+      comp['H2O'] = Math.round(Math.min(f, 1) * 0.1 * N + 5);
+    } else if (acidType === 'strong' && baseType === 'weak') {
+      comp['NH3']  = Math.round(Math.max(1 - f, 0) * 0.4 * N);
+      comp['NH4+'] = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['OH-']  = Math.round(Math.max(1 - f, 0) * 0.02 * N);
+      comp['Cl-']  = Math.round(Math.min(f, 1) * 0.3 * N + Math.max(f-1,0)*0.3*N);
+      comp['H+']   = Math.round(Math.max(f - 1, 0) * 0.35 * N);
+      comp['H2O']  = 5;
+    } else if (acidType === 'weak' && baseType === 'strong') {
+      comp['OH-']      = Math.round(Math.max(1 - f, 0) * 0.4 * N);
+      comp['Na+']      = Math.round(0.3 * N);
+      comp['CH3COO-']  = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['CH3COOH']  = Math.round(Math.max(f - 1, 0) * 0.3 * N);
+      comp['H+']       = Math.round(Math.max(f - 1, 0) * 0.02 * N);
+      comp['H2O']      = 5;
+    } else {
+      comp['NH3']      = Math.round(Math.max(1 - f, 0) * 0.35 * N);
+      comp['NH4+']     = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['CH3COO-']  = Math.round(Math.min(f, 1) * 0.3 * N);
+      comp['CH3COOH']  = Math.round(Math.max(f - 1, 0) * 0.3 * N);
+      comp['H2O']      = 5;
+    }
+  }
+
+  // Clean up zeros
+  for (const k of Object.keys(comp)) if (comp[k] <= 0) delete comp[k];
+  return comp;
+}
+
+function getBackComposition(bState) {
+  const ws  = WATER_SOURCES[bState.waterSource];
+  const vol = bState.volumeAdded;
+  const veq = (() => {
+    const n_metals = (ws.Ca + ws.Mg) * (bState.sampleVol / 1000);
+    const n_exc    = bState.edtaConc * (bState.edtaVol / 1000) - n_metals;
+    return Math.max(0, n_exc / bState.mgConc * 1000);
+  })();
+  const f = veq > 0 ? Math.min(vol / veq, 2.5) : (vol > 0 ? 2.5 : 0);
+
+  const N   = 60;
+  const hasCa = ws.Ca > 0;
+  const hasMg = ws.Mg > 0;
+
+  const comp = {};
+  // Always have EDTA complexes from the initial metals
+  if (hasCa) comp['EDTA-Ca'] = Math.round(0.2 * N);
+  if (hasMg) comp['EDTA-Mg'] = Math.round(0.2 * N);
+
+  if (f < 1) {
+    // Excess EDTA present — consuming as Mg added
+    comp['EDTA'] = Math.round(Math.max(1 - f, 0) * 0.3 * N);
+    // Some EDTA-Mg from titrant
+    if (f > 0) comp['EDTA-Mg'] = (comp['EDTA-Mg'] || 0) + Math.round(f * 0.15 * N);
+  } else {
+    // Endpoint passed — free Mg2+ appears
+    comp['free-Mg'] = Math.round(Math.min(f - 1, 1) * 0.4 * N);
+    comp['EBT-Mg']  = Math.round(Math.min(f - 1, 1) * 0.1 * N);
+  }
+
+  for (const k of Object.keys(comp)) if (comp[k] <= 0) delete comp[k];
+  return comp;
+}
+
+function syncParticles(particles, targetComp, liquidTop) {
+  const bb = getParticleBounds(liquidTop);
+  // Count current
+  const current = {};
+  for (const p of particles) {
+    current[p.type] = (current[p.type] || 0) + 1;
+  }
+  // Remove excess
+  for (const type of Object.keys(current)) {
+    const target = targetComp[type] || 0;
+    let count = current[type];
+    let i = particles.length - 1;
+    while (count > target && i >= 0) {
+      if (particles[i].type === type) {
+        particles.splice(i, 1);
+        count--;
+      }
+      i--;
+    }
+  }
+  // Add missing
+  for (const [type, cnt] of Object.entries(targetComp)) {
+    const have = particles.filter(p => p.type === type).length;
+    for (let i = have; i < cnt; i++) {
+      const px = bb.left  + Math.random() * (bb.right - bb.left);
+      const py = bb.top   + Math.random() * (bb.bottom - bb.top);
+      particles.push(mkParticle(type, px, py));
+    }
+  }
+}
+
+// ============================================================
+// CANVAS DRAWING
+// ============================================================
+
+function getLiquidTop(volumeMl) {
+  const pct = Math.min(volumeMl / 110, 0.92);
+  return BK.bottom - pct * (BK.bottom - BK.top);
+}
+
+function drawBeakerScene(ctx, particles, volumeMl, pH_or_pMg, indicatorFn, bgFn, drop, splashParticles, isBack) {
+  const W = 400, H = 440;
+  const liquidTop = getLiquidTop(volumeMl);
+  const indicColor = indicatorFn(pH_or_pMg);
+  const bgColor    = bgFn(pH_or_pMg);
+
+  // Clear
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Burette ──
+  const bur = { x: BUR_X - 6, w: 12, top: 10, bottom: BUR_Y - 2 };
+  // Burette body
+  ctx.fillStyle = 'rgba(148,163,184,0.15)';
+  ctx.fillRect(bur.x, bur.top, bur.w, bur.bottom - bur.top);
+  ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(bur.x, bur.top, bur.w, bur.bottom - bur.top);
+  // Graduation marks
+  ctx.strokeStyle = 'rgba(148,163,184,0.3)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 10; i++) {
+    const y = bur.top + i * (bur.bottom - bur.top) / 10;
+    ctx.beginPath();
+    ctx.moveTo(bur.x + bur.w, y);
+    ctx.lineTo(bur.x + bur.w + 5, y);
+    ctx.stroke();
+  }
+  // Stopcock
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(bur.x - 6, BUR_Y - 14, bur.w + 12, 7);
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bur.x - 6, BUR_Y - 14, bur.w + 12, 7);
+  // Tip
+  ctx.fillStyle = 'rgba(148,163,184,0.7)';
+  ctx.beginPath();
+  ctx.moveTo(BUR_X - 4, BUR_Y - 7);
+  ctx.lineTo(BUR_X + 4, BUR_Y - 7);
+  ctx.lineTo(BUR_X + 2, BUR_Y + 2);
+  ctx.lineTo(BUR_X - 2, BUR_Y + 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Burette label
+  const titrantLabel = isBack ? 'Mg²⁺' : (stdState.direction === 'base_into_acid'
+    ? (stdState.baseType === 'strong' ? 'NaOH' : 'NH₃')
+    : (stdState.acidType === 'strong' ? 'HCl' : 'CH₃COOH'));
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(titrantLabel, BUR_X + 28, bur.top + 20);
+
+  // ── Solution fill ──
+  ctx.save();
+  // Clip to beaker interior
+  const beakerClip = new Path2D();
+  beakerClip.moveTo(BK.left + BK.wall, liquidTop);
+  beakerClip.lineTo(BK.left + BK.wall, BK.bottom - BK.bRad);
+  beakerClip.arcTo(BK.left + BK.wall, BK.bottom - BK.wall,
+                   BK.left + BK.bRad, BK.bottom - BK.wall, BK.bRad);
+  beakerClip.lineTo(BK.right - BK.bRad, BK.bottom - BK.wall);
+  beakerClip.arcTo(BK.right - BK.wall, BK.bottom - BK.wall,
+                   BK.right - BK.wall, BK.bottom - BK.bRad, BK.bRad);
+  beakerClip.lineTo(BK.right - BK.wall, liquidTop);
+  beakerClip.closePath();
+  ctx.clip(beakerClip);
+
+  // Solution base color
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(BK.left, BK.top, BK.right - BK.left, BK.bottom - BK.top);
+
+  // Indicator tint
+  ctx.fillStyle = indicColor;
+  ctx.fillRect(BK.left, liquidTop, BK.right - BK.left, BK.bottom - liquidTop);
+
+  // Surface shimmer
+  const shimmerGrad = ctx.createLinearGradient(BK.left, liquidTop, BK.left, liquidTop + 12);
+  shimmerGrad.addColorStop(0, 'rgba(255,255,255,0.08)');
+  shimmerGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = shimmerGrad;
+  ctx.fillRect(BK.left, liquidTop, BK.right - BK.left, 12);
+
+  ctx.restore();
+
+  // ── Particles ──
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.alpha || 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(p.x - p.r*0.3, p.y - p.r*0.3, p.r*0.1, p.x, p.y, p.r);
+    grad.addColorStop(0, lighten(p.fill, 0.3));
+    grad.addColorStop(1, p.fill);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = p.stroke;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Splash particles ──
+  for (const sp of splashParticles) {
+    ctx.save();
+    ctx.globalAlpha = sp.alpha;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, sp.r, 0, Math.PI * 2);
+    ctx.fillStyle = sp.fill;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Beaker glass outline ──
+  ctx.strokeStyle = 'rgba(203,213,225,0.7)';
+  ctx.lineWidth = BK.wall;
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(BK.left, BK.top);
+  ctx.lineTo(BK.left, BK.bottom - BK.bRad);
+  ctx.arcTo(BK.left, BK.bottom, BK.left + BK.bRad, BK.bottom, BK.bRad);
+  ctx.lineTo(BK.right - BK.bRad, BK.bottom);
+  ctx.arcTo(BK.right, BK.bottom, BK.right, BK.bottom - BK.bRad, BK.bRad);
+  ctx.lineTo(BK.right, BK.top);
+  ctx.stroke();
+  // Rim
+  ctx.strokeStyle = 'rgba(203,213,225,0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(BK.left - 6, BK.top);
+  ctx.lineTo(BK.right + 6, BK.top);
+  ctx.stroke();
+
+  // Volume markers on beaker
+  ctx.fillStyle = 'rgba(100,116,139,0.6)';
+  ctx.font = '9px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  for (let v = 20; v <= 100; v += 20) {
+    const y = getLiquidTop(v);
+    if (y >= BK.top && y <= BK.bottom) {
+      ctx.beginPath();
+      ctx.moveTo(BK.right + 2, y);
+      ctx.lineTo(BK.right + 8, y);
+      ctx.strokeStyle = 'rgba(100,116,139,0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillText(v + ' mL', BK.right + 10, y + 4);
+    }
+  }
+
+  // ── Drop animation ──
+  if (drop && drop.active) {
+    const dropColor = isBack ? PTYPES['Mg2+'].fill
+      : (stdState.direction === 'base_into_acid'
+          ? (stdState.baseType === 'strong' ? '#3b82f6' : '#a78bfa')
+          : (stdState.acidType === 'strong' ? '#ef4444' : '#fbbf24'));
+    ctx.save();
+    ctx.shadowColor = dropColor;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(drop.x, drop.y, drop.r, 0, Math.PI * 2);
+    ctx.fillStyle = dropColor;
+    ctx.globalAlpha = drop.alpha || 1;
+    ctx.fill();
+    ctx.restore();
+    // Connecting thread
+    if (drop.y > BUR_Y + 4) {
+      ctx.strokeStyle = `${dropColor}60`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(BUR_X, BUR_Y + 2);
+      ctx.lineTo(BUR_X, drop.y - drop.r);
+      ctx.stroke();
+    }
+  }
+
+  // ── Labels ──
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '12px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  const analLabel = isBack ? 'Water Sample + EDTA'
+    : (stdState.direction === 'base_into_acid'
+        ? (stdState.acidType === 'strong' ? 'HCl (aq)' : 'CH₃COOH (aq)')
+        : (stdState.baseType === 'strong' ? 'NaOH (aq)' : 'NH₃ (aq)'));
+  ctx.fillText(analLabel, (BK.left + BK.right) / 2, BK.bottom + 20);
+
+  // pH / pMg display
+  ctx.font = 'bold 14px Inter, sans-serif';
+  ctx.fillStyle = '#38bdf8';
+  ctx.textAlign = 'left';
+  const label = isBack ? `pMg = ${(typeof pH_or_pMg === 'number') ? pH_or_pMg.toFixed(2) : '—'}`
+                       : `pH = ${(typeof pH_or_pMg === 'number') ? pH_or_pMg.toFixed(2) : '—'}`;
+  ctx.fillText(label, BK.left, BK.top - 8);
+
+  // Liquid level line
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(BK.left + BK.wall, liquidTop);
+  ctx.lineTo(BK.right - BK.wall, liquidTop);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function lighten(hex, amt) {
+  // Simple lighten: add amt*255 to each channel
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  const rl = Math.min(255, r + Math.round(amt * 255));
+  const gl = Math.min(255, g + Math.round(amt * 255));
+  const bl = Math.min(255, b + Math.round(amt * 255));
+  return `rgb(${rl},${gl},${bl})`;
+}
+
+// ============================================================
+// CHART
+// ============================================================
+
+let stdChart = null;
+let backChart = null;
+
+function initStdChart() {
+  const ctx = document.getElementById('titrationChart').getContext('2d');
+  if (stdChart) stdChart.destroy();
+  stdChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'pH',
+          data: [],
+          borderColor: '#38bdf8',
+          backgroundColor: '#38bdf8',
+          showLine: true,
+          tension: 0.3,
+          pointRadius: 1.5,
+          borderWidth: 2,
+          order: 2,
+        },
+        {
+          label: 'Current',
+          data: [],
+          borderColor: '#f59e0b',
+          backgroundColor: '#f59e0b',
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          showLine: false,
+          order: 1,
+        },
+        {
+          label: 'Eq. Point',
+          data: [],
+          borderColor: '#f59e0b',
+          backgroundColor: '#f59e0b66',
+          pointRadius: 10,
+          pointStyle: 'circle',
+          showLine: false,
+          order: 0,
+        },
+        {
+          label: '½ Eq. Point',
+          data: [],
+          borderColor: '#a78bfa',
+          backgroundColor: '#a78bfa66',
+          pointRadius: 10,
+          pointStyle: 'circle',
+          showLine: false,
+          order: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `V = ${ctx.parsed.x.toFixed(2)} mL, pH = ${ctx.parsed.y.toFixed(2)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Volume Titrant (mL)', color: '#64748b' },
+          min: 0,
+          ticks: { color: '#64748b' },
+          grid: { color: 'rgba(51,65,85,0.5)' },
+        },
+        y: {
+          title: { display: true, text: 'pH', color: '#64748b' },
+          min: 0, max: 14,
+          ticks: { color: '#64748b', stepSize: 2 },
+          grid: { color: 'rgba(51,65,85,0.5)' },
+        },
+      },
+    },
+  });
+}
+
+function initBackChart() {
+  const ctx = document.getElementById('backTitrationChart').getContext('2d');
+  if (backChart) backChart.destroy();
+  backChart = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'pMg',
+          data: [],
+          borderColor: '#5eead4',
+          backgroundColor: '#5eead4',
+          showLine: true,
+          tension: 0.3,
+          pointRadius: 1.5,
+          borderWidth: 2,
+          order: 2,
+        },
+        {
+          label: 'Current',
+          data: [],
+          borderColor: '#f59e0b',
+          backgroundColor: '#f59e0b',
+          pointRadius: 6,
+          showLine: false,
+          order: 1,
+        },
+        {
+          label: 'Endpoint',
+          data: [],
+          borderColor: '#f59e0b',
+          backgroundColor: '#f59e0b66',
+          pointRadius: 10,
+          showLine: false,
+          order: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: { legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `V = ${ctx.parsed.x.toFixed(2)} mL, pMg = ${ctx.parsed.y.toFixed(2)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Volume Mg²⁺ (mL)', color: '#64748b' },
+          min: 0,
+          ticks: { color: '#64748b' },
+          grid: { color: 'rgba(51,65,85,0.5)' },
+        },
+        y: {
+          title: { display: true, text: 'pMg', color: '#64748b' },
+          min: 0, max: 14,
+          ticks: { color: '#64748b', stepSize: 2 },
+          grid: { color: 'rgba(51,65,85,0.5)' },
+        },
+      },
+    },
+  });
+}
+
+function updateStdChart(revealAll) {
+  if (!stdChart) return;
+  const pts = revealAll ? stdState.fullCurve : stdState.chartData;
+  stdChart.data.datasets[0].data = pts;
+  // Current point
+  stdChart.data.datasets[1].data = stdState.pH !== null
+    ? [{ x: stdState.volumeAdded, y: stdState.pH }] : [];
+
+  // Eq markers
+  if (stdState.showMarkers) {
+    if (stdState.eqVol !== null) {
+      stdChart.data.datasets[2].data = [{ x: stdState.eqVol, y: stdState.eqPH }];
+    }
+    if (stdState.halfEqVol !== null && (stdState.acidType === 'weak' || stdState.baseType === 'weak')) {
+      stdChart.data.datasets[3].data = [{ x: stdState.halfEqVol, y: stdState.halfEqPH }];
+    }
+  } else {
+    stdChart.data.datasets[2].data = [];
+    stdChart.data.datasets[3].data = [];
+  }
+
+  // Auto-scale x axis
+  const maxV = stdState.fullCurve.length > 0
+    ? stdState.fullCurve[stdState.fullCurve.length - 1].x : 50;
+  stdChart.options.scales.x.max = maxV;
+  stdChart.update('none');
+}
+
+function updateBackChart(revealAll) {
+  if (!backChart) return;
+  const pts = revealAll ? backState.fullCurve : backState.chartData;
+  backChart.data.datasets[0].data = pts;
+  backChart.data.datasets[1].data = backState.pMg !== null
+    ? [{ x: backState.volumeAdded, y: backState.pMg }] : [];
+  if (backState.showMarkers && backState.eqVol !== null) {
+    backChart.data.datasets[2].data = [{ x: backState.eqVol, y: calcPMg(backState, backState.eqVol) }];
+  } else {
+    backChart.data.datasets[2].data = [];
+  }
+  const maxV = backState.fullCurve.length > 0
+    ? backState.fullCurve[backState.fullCurve.length - 1].x : 30;
+  backChart.options.scales.x.max = maxV;
+  backChart.update('none');
+}
+
+// ============================================================
+// STATE
+// ============================================================
+
+const stdState = {
+  acidType: 'strong',
+  baseType: 'strong',
+  acidConc: 0.1,
+  baseConc: 0.1,
+  analyteVol: 25,
+  indicator: 'phenolphthalein',
+  direction: 'base_into_acid',
+  dropVol: 0.05,
+  volumeAdded: 0,
+  pH: null,
+  chartData: [],
+  fullCurve: [],
+  eqVol: null, eqPH: null,
+  halfEqVol: null, halfEqPH: null,
+  showMarkers: false,
+  particles: [],
+  drop: { active: false, x: BUR_X, y: BUR_Y, r: 4, vy: 0, alpha: 1 },
+  splashParticles: [],
+  isPlaying: false,
+  isFast: false,
+  playAccum: 0,
+  isComplete: false,
+};
+
+const backState = {
+  waterSource: 'moderate',
+  sampleVol: 25,
+  edtaVol: 25,
+  edtaConc: 0.01,
+  mgConc: 0.01,
+  dropVol: 0.05,
+  volumeAdded: 0,
+  pMg: null,
+  chartData: [],
+  fullCurve: [],
+  eqVol: null,
+  showMarkers: false,
+  particles: [],
+  drop: { active: false, x: BUR_X, y: BUR_Y, r: 4, vy: 0, alpha: 1 },
+  splashParticles: [],
+  isPlaying: false,
+  isFast: false,
+  playAccum: 0,
+  isComplete: false,
+};
+
+// ============================================================
+// INIT & RESET
+// ============================================================
+
+function prepStdState() {
+  stdState.volumeAdded = 0;
+  stdState.pH = computePH(stdState, 0);
+  stdState.chartData = [{ x: 0, y: stdState.pH }];
+  stdState.fullCurve = buildFullCurve(stdState);
+  stdState.eqVol = computeEquivVolume(stdState);
+  stdState.eqPH = computePH(stdState, stdState.eqVol);
+  const isWeak = stdState.acidType === 'weak' || stdState.baseType === 'weak';
+  stdState.halfEqVol = isWeak ? stdState.eqVol / 2 : null;
+  stdState.halfEqPH  = isWeak ? computePH(stdState, stdState.halfEqVol) : null;
+  stdState.showMarkers = false;
+  stdState.isComplete = false;
+  stdState.particles = [];
+  stdState.splashParticles = [];
+  stdState.drop.active = false;
+  stdState.isPlaying = false;
+  stdState.isFast = false;
+  stdState.playAccum = 0;
+  const liquidTop = getLiquidTop(stdState.analyteVol);
+  syncParticles(stdState.particles, getStdComposition(stdState), liquidTop);
+  updateStdUI();
+  updateStdChart(false);
+  updateStdLegend();
+  updateIndicatorInfo();
+}
+
+function prepBackState() {
+  backState.volumeAdded = 0;
+  backState.pMg = calcPMg(backState, 0);
+  backState.chartData = [{ x: 0, y: backState.pMg }];
+  backState.fullCurve = buildBackCurve(backState);
+  // Find equivalence volume
+  const ws = WATER_SOURCES[backState.waterSource];
+  const n_metals = (ws.Ca + ws.Mg) * (backState.sampleVol / 1000);
+  const n_exc    = backState.edtaConc * (backState.edtaVol / 1000) - n_metals;
+  backState.eqVol = Math.max(0, n_exc / backState.mgConc * 1000);
+  backState.showMarkers = false;
+  backState.isComplete = false;
+  backState.particles = [];
+  backState.splashParticles = [];
+  backState.drop.active = false;
+  backState.isPlaying = false;
+  backState.isFast = false;
+  backState.playAccum = 0;
+  const liquidTop = getLiquidTop(backState.sampleVol + backState.edtaVol);
+  syncParticles(backState.particles, getBackComposition(backState), liquidTop);
+  updateBackUI();
+  updateBackChart(false);
+  updateBackLegend();
+  updateWaterInfo();
+}
+
+function resetStd() {
+  stdState.isPlaying = false;
+  stdState.isFast = false;
+  updatePlayBtns();
+  prepStdState();
+}
+
+function resetBack() {
+  backState.isPlaying = false;
+  backState.isFast = false;
+  updateBackPlayBtns();
+  prepBackState();
+}
+
+// ============================================================
+// UI UPDATES
+// ============================================================
+
+function updateStdUI() {
+  document.getElementById('pHDisplay').textContent =
+    stdState.pH !== null ? stdState.pH.toFixed(3) : '—';
+  document.getElementById('volDisplay').textContent =
+    stdState.volumeAdded.toFixed(2) + ' mL';
+  document.getElementById('eqVolDisplay').textContent =
+    stdState.eqVol !== null ? stdState.eqVol.toFixed(2) + ' mL' : '—';
+
+  const isWeak = stdState.acidType === 'weak' || stdState.baseType === 'weak';
+  if (stdState.showMarkers) {
+    document.getElementById('eqMarkerRow').style.display = 'flex';
+    document.getElementById('eqMarkerVal').textContent =
+      `V = ${stdState.eqVol.toFixed(2)} mL, pH = ${stdState.eqPH.toFixed(2)}`;
+    if (isWeak && stdState.halfEqVol !== null) {
+      document.getElementById('halfEqMarkerRow').style.display = 'flex';
+      document.getElementById('halfEqMarkerVal').textContent =
+        `V = ${stdState.halfEqVol.toFixed(2)} mL, pH = ${stdState.halfEqPH.toFixed(2)}`;
+    }
+    document.getElementById('markersHint').style.display = 'none';
+  }
+}
+
+function updateBackUI() {
+  document.getElementById('pMgDisplay').textContent =
+    backState.pMg !== null ? backState.pMg.toFixed(3) : '—';
+  document.getElementById('backVolDisplay').textContent =
+    backState.volumeAdded.toFixed(2) + ' mL';
+  document.getElementById('backEqDisplay').textContent =
+    backState.eqVol !== null ? backState.eqVol.toFixed(2) + ' mL' : '—';
+
+  if (backState.showMarkers && backState.eqVol !== null) {
+    document.getElementById('backEqMarkerRow').style.display = 'flex';
+    document.getElementById('backEqMarkerVal').textContent =
+      `V = ${backState.eqVol.toFixed(2)} mL`;
+    document.getElementById('backMarkersHint').style.display = 'none';
+    const hardness = computeHardness(backState, backState.eqVol);
+    document.getElementById('hardnessResult').textContent =
+      hardness > 0 ? `${hardness.toFixed(0)} ppm CaCO₃` : '0 ppm (pure)';
+  }
+}
+
+function updateWaterInfo() {
+  const ws = WATER_SOURCES[backState.waterSource];
+  document.getElementById('wCa').textContent = `${(ws.Ca * 1000).toFixed(2)} mmol/L`;
+  document.getElementById('wMg').textContent = `${(ws.Mg * 1000).toFixed(2)} mmol/L`;
+  const hardness = (ws.Ca + ws.Mg) * 100000;
+  document.getElementById('wHardness').textContent = `${hardness.toFixed(0)} ppm CaCO₃`;
+}
+
+function updateStdLegend() {
+  const comp = getStdComposition(stdState);
+  const legend = document.getElementById('stdLegend');
+  legend.innerHTML = '';
+  for (const type of Object.keys(comp)) {
+    if (!PTYPES[type]) continue;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `
+      <div class="legend-dot" style="background:${PTYPES[type].fill};border:1.5px solid ${PTYPES[type].stroke}"></div>
+      <span>${PTYPES[type].label}</span>
+    `;
+    legend.appendChild(item);
+  }
+}
+
+function updateBackLegend() {
+  const comp = getBackComposition(backState);
+  const legend = document.getElementById('backLegend');
+  legend.innerHTML = '';
+  for (const type of Object.keys(comp)) {
+    if (!PTYPES[type]) continue;
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `
+      <div class="legend-dot" style="background:${PTYPES[type].fill};border:1.5px solid ${PTYPES[type].stroke}"></div>
+      <span>${PTYPES[type].label}</span>
+    `;
+    legend.appendChild(item);
+  }
+}
+
+function updateIndicatorInfo() {
+  const ind = INDICATORS[stdState.indicator];
+  const info = document.getElementById('indicatorInfo');
+  info.innerHTML = `
+    <strong>${ind.label}</strong>
+    <div>Transition range: <strong>${ind.range}</strong></div>
+    <div>
+      Acid side: <span class="color-swatch" style="background:${getSwatchColor(ind, 2)}"></span>${ind.acidColor}
+      &nbsp; Base side: <span class="color-swatch" style="background:${getSwatchColor(ind, 12)}"></span>${ind.baseColor}
+    </div>
+  `;
+}
+
+function getSwatchColor(ind, pH) {
+  const c = ind.solution(pH);
+  if (c.includes('rgba(200,230') || c.includes('0.08')) return 'transparent';
+  return c;
+}
+
+function updatePlayBtns() {
+  const btnPlay = document.getElementById('btnPlay');
+  const btnFast = document.getElementById('btnFast');
+  btnPlay.textContent = stdState.isPlaying && !stdState.isFast ? '⏸ Pause' : '▶ Play';
+  btnFast.textContent = stdState.isPlaying && stdState.isFast  ? '⏸ Pause' : '▶▶ Fast';
+  btnPlay.classList.toggle('btn-primary', stdState.isPlaying && !stdState.isFast);
+  btnFast.classList.toggle('btn-primary', stdState.isPlaying && stdState.isFast);
+}
+
+function updateBackPlayBtns() {
+  const btnPlay = document.getElementById('btnBackPlay');
+  const btnFast = document.getElementById('btnBackFast');
+  btnPlay.textContent = backState.isPlaying && !backState.isFast ? '⏸ Pause' : '▶ Play';
+  btnFast.textContent = backState.isPlaying && backState.isFast  ? '⏸ Pause' : '▶▶ Fast';
+  btnPlay.classList.toggle('btn-primary', backState.isPlaying && !backState.isFast);
+  btnFast.classList.toggle('btn-primary', backState.isPlaying && backState.isFast);
+}
+
+// ============================================================
+// DROP MECHANICS
+// ============================================================
+
+function triggerDrop(state, onLand) {
+  if (state.drop.active) return;
+  state.drop.active = true;
+  state.drop.x = BUR_X;
+  state.drop.y = BUR_Y;
+  state.drop.vy = 10;
+  state.drop.r = 5;
+  state.drop.alpha = 1;
+  state.drop._onLand = onLand;
+}
+
+function updateDrop(state, dt) {
+  const d = state.drop;
+  if (!d.active) return;
+  const liquidTop = getLiquidTop(state.volumeAdded + state.analyteVol || state.sampleVol + state.edtaVol);
+
+  d.vy += 500 * dt;
+  d.y += d.vy * dt;
+
+  if (d.y >= liquidTop) {
+    // Land
+    d.active = false;
+    if (d._onLand) d._onLand();
+    // Splash effect
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2;
+      const spd = 60 + Math.random() * 60;
+      state.splashParticles.push({
+        x: d.x, y: liquidTop,
+        vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 40,
+        r: 2 + Math.random() * 2,
+        fill: d.fill || '#38bdf8',
+        alpha: 1,
+      });
+    }
+  }
+}
+
+function updateSplash(state, dt) {
+  for (const sp of state.splashParticles) {
+    sp.x += sp.vx * dt;
+    sp.y += sp.vy * dt;
+    sp.vy += 150 * dt;
+    sp.alpha -= dt * 2.5;
+  }
+  state.splashParticles = state.splashParticles.filter(sp => sp.alpha > 0);
+}
+
+// ============================================================
+// STANDARD TITRATION ACTIONS
+// ============================================================
+
+function addStdDrop(volOverride) {
+  const vol = volOverride !== undefined ? volOverride : stdState.dropVol;
+  const maxVol = stdState.fullCurve[stdState.fullCurve.length - 1].x;
+  if (stdState.volumeAdded >= maxVol) return false;
+
+  stdState.volumeAdded = Math.min(stdState.volumeAdded + vol, maxVol);
+  stdState.pH = computePH(stdState, stdState.volumeAdded);
+
+  // Throttle chart data points (keep ~400 max)
+  const lastPt = stdState.chartData[stdState.chartData.length - 1];
+  if (!lastPt || stdState.volumeAdded - lastPt.x >= maxVol / 400) {
+    stdState.chartData.push({ x: +stdState.volumeAdded.toFixed(4), y: stdState.pH });
+  }
+
+  // Update particles
+  const totalVol = stdState.analyteVol + stdState.volumeAdded;
+  const liquidTop = getLiquidTop(totalVol);
+  syncParticles(stdState.particles, getStdComposition(stdState), liquidTop);
+  updateStdLegend();
+  updateStdUI();
+  updateStdChart(false);
+
+  return stdState.volumeAdded < maxVol;
+}
+
+function addDrop() {
+  if (stdState.drop.active) return;
+  triggerDrop(stdState, () => {
+    addStdDrop();
+  });
+}
+
+function togglePlay() {
+  if (stdState.isPlaying && !stdState.isFast) {
+    stdState.isPlaying = false;
+  } else {
+    stdState.isPlaying = true;
+    stdState.isFast = false;
+  }
+  updatePlayBtns();
+}
+
+function toggleFast() {
+  if (stdState.isPlaying && stdState.isFast) {
+    stdState.isPlaying = false;
+    stdState.isFast = false;
+  } else {
+    stdState.isPlaying = true;
+    stdState.isFast = true;
+  }
+  updatePlayBtns();
+}
+
+function skipToHalfEq() {
+  if (!stdState.halfEqVol) return;
+  while (stdState.volumeAdded < stdState.halfEqVol - stdState.dropVol * 0.5) {
+    addStdDrop();
+  }
+  addStdDrop(stdState.halfEqVol - stdState.volumeAdded);
+  stdState.showMarkers = false;
+  updateStdUI();
+  updateStdChart(false);
+}
+
+function skipToEq() {
+  const veq = stdState.eqVol;
+  while (stdState.volumeAdded < veq - stdState.dropVol * 0.5) {
+    addStdDrop();
+  }
+  addStdDrop(veq - stdState.volumeAdded);
+  stdState.showMarkers = false;
+  updateStdUI();
+  updateStdChart(false);
+}
+
+function skipToEnd() {
+  stdState.volumeAdded = stdState.fullCurve[stdState.fullCurve.length - 1].x;
+  stdState.pH = computePH(stdState, stdState.volumeAdded);
+  stdState.chartData = [...stdState.fullCurve];
+  stdState.showMarkers = true;
+  stdState.isPlaying = false;
+  stdState.isFast = false;
+  updatePlayBtns();
+  const liquidTop = getLiquidTop(stdState.analyteVol + stdState.volumeAdded);
+  syncParticles(stdState.particles, getStdComposition(stdState), liquidTop);
+  updateStdLegend();
+  updateStdUI();
+  updateStdChart(true);
+}
+
+// ============================================================
+// BACK TITRATION ACTIONS
+// ============================================================
+
+function addBackDropAmt(volOverride) {
+  const vol = volOverride !== undefined ? volOverride : backState.dropVol;
+  const maxVol = backState.fullCurve.length > 0
+    ? backState.fullCurve[backState.fullCurve.length - 1].x : 50;
+  if (backState.volumeAdded >= maxVol) return false;
+
+  backState.volumeAdded = Math.min(backState.volumeAdded + vol, maxVol);
+  backState.pMg = calcPMg(backState, backState.volumeAdded);
+
+  const lastPt = backState.chartData[backState.chartData.length - 1];
+  if (!lastPt || backState.volumeAdded - lastPt.x >= maxVol / 300) {
+    backState.chartData.push({ x: +backState.volumeAdded.toFixed(4), y: backState.pMg });
+  }
+
+  const totalVol = backState.sampleVol + backState.edtaVol + backState.volumeAdded;
+  const liquidTop = getLiquidTop(totalVol);
+  syncParticles(backState.particles, getBackComposition(backState), liquidTop);
+  updateBackLegend();
+  updateBackUI();
+  updateBackChart(false);
+
+  return backState.volumeAdded < maxVol;
+}
+
+function addBackDrop() {
+  if (backState.drop.active) return;
+  triggerDrop(backState, () => {
+    addBackDropAmt();
+  });
+}
+
+function toggleBackPlay() {
+  if (backState.isPlaying && !backState.isFast) {
+    backState.isPlaying = false;
+  } else {
+    backState.isPlaying = true;
+    backState.isFast = false;
+  }
+  updateBackPlayBtns();
+}
+
+function toggleBackFast() {
+  if (backState.isPlaying && backState.isFast) {
+    backState.isPlaying = false;
+    backState.isFast = false;
+  } else {
+    backState.isPlaying = true;
+    backState.isFast = true;
+  }
+  updateBackPlayBtns();
+}
+
+function skipBackToEndpoint() {
+  const veq = backState.eqVol;
+  while (backState.volumeAdded < veq - backState.dropVol * 0.5) {
+    addBackDropAmt();
+  }
+  addBackDropAmt(veq - backState.volumeAdded);
+  updateBackUI();
+  updateBackChart(false);
+}
+
+function skipBackToEnd() {
+  backState.volumeAdded = backState.fullCurve[backState.fullCurve.length - 1].x;
+  backState.pMg = calcPMg(backState, backState.volumeAdded);
+  backState.chartData = [...backState.fullCurve];
+  backState.showMarkers = true;
+  backState.isPlaying = false;
+  backState.isFast = false;
+  updateBackPlayBtns();
+  const totalVol = backState.sampleVol + backState.edtaVol + backState.volumeAdded;
+  const liquidTop = getLiquidTop(totalVol);
+  syncParticles(backState.particles, getBackComposition(backState), liquidTop);
+  updateBackLegend();
+  updateBackUI();
+  updateBackChart(true);
+}
+
+// ============================================================
+// SETTINGS HANDLERS
+// ============================================================
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if ((name === 'standard' && btn.textContent.startsWith('Standard')) ||
+        (name === 'back' && btn.textContent.startsWith('Back'))) {
+      btn.classList.add('active');
+    }
+  });
+}
+
+function setToggleBtns(rowId, activeText) {
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  row.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim() === activeText);
+  });
+}
+
+function setAcidType(type) {
+  stdState.acidType = type;
+  document.querySelectorAll('#tab-standard .ctrl-section:first-child .toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(type));
+  });
+  document.getElementById('acidName').textContent =
+    type === 'strong' ? 'HCl (hydrochloric acid)' : 'CH₃COOH (acetic acid)';
+  prepStdState();
+}
+
+function setBaseType(type) {
+  stdState.baseType = type;
+  document.querySelectorAll('#tab-standard .ctrl-section:nth-child(3) .toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim().toLowerCase().startsWith(type));
+  });
+  document.getElementById('baseName').textContent =
+    type === 'strong' ? 'NaOH (sodium hydroxide)' : 'NH₃ (ammonia)';
+  prepStdState();
+}
+
+function setDirection(dir) {
+  stdState.direction = dir;
+  document.querySelectorAll('#tab-standard .ctrl-section:nth-child(5) .toggle-btn').forEach(b => {
+    b.classList.toggle('active',
+      (dir === 'base_into_acid' && b.textContent.includes('Base')) ||
+      (dir === 'acid_into_base' && b.textContent.includes('Acid')));
+  });
+  prepStdState();
+}
+
+function setIndicator(val) {
+  stdState.indicator = val;
+  updateIndicatorInfo();
+}
+
+function updateAcidConc(val) {
+  stdState.acidConc = parseFloat(val);
+  document.getElementById('acidConcVal').textContent = parseFloat(val).toFixed(2) + ' M';
+  prepStdState();
+}
+
+function updateBaseConc(val) {
+  stdState.baseConc = parseFloat(val);
+  document.getElementById('baseConcVal').textContent = parseFloat(val).toFixed(2) + ' M';
+  prepStdState();
+}
+
+function updateDropVol(val) {
+  stdState.dropVol = parseFloat(val);
+  document.getElementById('dropVolVal').textContent = parseFloat(val).toFixed(2) + ' mL';
+}
+
+function setWaterSource(val) {
+  backState.waterSource = val;
+  prepBackState();
+}
+
+function updateBackDropVol(val) {
+  backState.dropVol = parseFloat(val);
+  document.getElementById('backDropVolVal').textContent = parseFloat(val).toFixed(2) + ' mL';
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+
+let lastTime = null;
+
+function animLoop(ts) {
+  if (!lastTime) lastTime = ts;
+  const rawDt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  // ── Standard tab ──
+  const stdCanvas = document.getElementById('beakerCanvas');
+  const stdCtx = stdCanvas.getContext('2d');
+
+  const stdTotalVol = stdState.analyteVol + stdState.volumeAdded;
+  const stdLiqTop = getLiquidTop(stdTotalVol);
+  const stdInd = INDICATORS[stdState.indicator];
+  const stdPH = stdState.pH !== null ? stdState.pH : computePH(stdState, 0);
+
+  // Auto-play
+  if (stdState.isPlaying) {
+    const dropsPerSec = stdState.isFast ? 15 : 3;
+    stdState.playAccum += rawDt * dropsPerSec;
+    while (stdState.playAccum >= 1) {
+      stdState.playAccum -= 1;
+      const more = addStdDrop();
+      if (!more) {
+        stdState.isPlaying = false;
+        stdState.showMarkers = true;
+        updateStdUI();
+        updateStdChart(true);
+        updatePlayBtns();
+        break;
+      }
+    }
+  }
+
+  // Update drop / splash
+  updateDrop(stdState, rawDt);
+  updateSplash(stdState, rawDt);
+
+  updateParticles(stdState.particles, stdLiqTop, rawDt);
+
+  drawBeakerScene(stdCtx, stdState.particles, stdTotalVol, stdPH,
+    stdInd.solution, stdInd.bg, stdState.drop, stdState.splashParticles, false);
+
+  // ── Back tab ──
+  const backCanvas = document.getElementById('backBeakerCanvas');
+  const backCtx = backCanvas.getContext('2d');
+
+  const backTotalVol = backState.sampleVol + backState.edtaVol + backState.volumeAdded;
+  const backLiqTop = getLiquidTop(backTotalVol);
+  const backPMg = backState.pMg !== null ? backState.pMg : calcPMg(backState, 0);
+
+  if (backState.isPlaying) {
+    const dropsPerSec = backState.isFast ? 15 : 3;
+    backState.playAccum += rawDt * dropsPerSec;
+    while (backState.playAccum >= 1) {
+      backState.playAccum -= 1;
+      const more = addBackDropAmt();
+      if (!more) {
+        backState.isPlaying = false;
+        backState.showMarkers = true;
+        updateBackUI();
+        updateBackChart(true);
+        updateBackPlayBtns();
+        break;
+      }
+    }
+  }
+
+  updateDrop(backState, rawDt);
+  updateSplash(backState, rawDt);
+  updateParticles(backState.particles, backLiqTop, rawDt);
+
+  drawBeakerScene(backCtx, backState.particles, backTotalVol, backPMg,
+    ebtColor, ebtBg, backState.drop, backState.splashParticles, true);
+
+  requestAnimationFrame(animLoop);
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+
+window.addEventListener('DOMContentLoaded', () => {
+  initStdChart();
+  initBackChart();
+  prepStdState();
+  prepBackState();
+  requestAnimationFrame(animLoop);
+});
+</script>
+</body>
+</html>
